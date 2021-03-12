@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: Roboto, Arial, sans-serif;
+      }
+
+      nav a {
+        padding-right: 1em;
+        padding-bottom: 0.5em;
+      }
+
+      span.SelectedLink {
+        padding-right: 1em;
+        padding-bottom: 0.5em;
+        font-weight: bold;
+      }
+
+      #PageContent {
+        padding-top: 0.5em;
+      }
+
+      td {
+        padding: 0.5em;
+        background-color: #e0e0e0;
+      }
+      
+      th {
+        font-weight: bold;
+        text-align: left;
+        padding: 0.5em;
+        background-color: #e0e0e0;
+      }
+
+      td.OffColor {
+        background-color: #f0f0f0;
+      }
+
+      div.IntroText {
+        padding-bottom: 0.5em;
+      }
+    </style>
+  </head>
+  <body>
+    <nav id="PageNav"></nav>
+    <h1 id="PageTitle"></h1>
+    <div id="PageContent"></div>
+    <script>
+
+      /*************************************************************************
+       * 
+       * DEBUG = true to output function entry / exit messages.
+       * 
+       ************************************************************************/
+      const DEBUG = true;
+
+      /*************************************************************************
+       * 
+       * DATA_ keeps track of our page headings / page data. At some point this
+       * will be used for filtering of the tables.
+       * 
+       ************************************************************************/
+      const DATA_ = {
+        'headings': null, 
+        'currentPage': null
+      };
+
+      /*************************************************************************
+       * These constants are used for HTML IDs and other useful programmatic
+       * text.
+       ************************************************************************/
+      const LOADING = "loading...";
+      const PAGE_CONTENT = "PageContent";
+      const PAGE_TITLE = "PageTitle";
+      const PAGE_NAV = "PageNav";
+
+      /*************************************************************************
+       * 
+       * Show the data in a table on the page. data comes from the Google Sheets
+       * function and should be an array of objects.
+       * 
+       ************************************************************************/
+      function showData(data) {
+        debugEnter("showData");
+
+        DATA_[DATA_.currentPage] = data;
+
+        let html = '';
+
+        if (DATA_.currentPage == 'SOME PAGE FOR CUSTOM HANDLING') {
+
+          // if you want to create any custom pages, add handling code here
+
+
+        } else {
+
+          let orderedColumns = null;
+
+          // Find our current page from DATA_.headings.
+          for (let i = 0; i < DATA_.headings.length; i++) {
+            if (DATA_.headings[i][0] == DATA_.currentPage) {
+              if (DATA_.headings[i].length >= 4) {
+                orderedColumns = DATA_.headings[i][3].split(',');
+              }
+              html += '<div class="IntroText">';
+              html += DATA_.headings[i][1];
+              html += '</div>';
+              break;
+            }
+          }
+
+          if (data) {
+            html += '<table>';
+
+            // Set up the table column headers, either as-is or ordered.
+            if (data.length > 0) {
+              html += '<tr>';
+              if (orderedColumns) {
+                for (let i = 0; i < orderedColumns.length; i++) {
+                  html += '<th>';
+                  html += orderedColumns[i];
+                  html += '</th>';
+                }
+              } else {
+                for (let property in data[0]) {
+                  if (property && property != 'visible') {
+                    html += '<th>';
+                    html += property;
+                    html += '</th>';
+                  }
+                }
+              }
+              html += '</tr>';
+            }
+            
+            // Set up the table cells, either as-is or ordered.
+            for (let i = 0; i < data.length; i++) {
+              html += '<tr>';
+              if (orderedColumns) {
+                for (let k = 0; k < orderedColumns.length; k++) {
+                  if (i % 2) {
+                    html += '<td>';
+                  } else {
+                    html += '<td class="OffColor">';
+                  }
+                  html += data[i][orderedColumns[k]];
+                  html += '</td>';
+                }
+              } else {
+                for (let property in data[i]) {
+                  if (property && property != 'visible') {
+                    if (i % 2) {
+                      html += '<td>';
+                    } else {
+                      html += '<td class="OffColor">';
+                    }
+                    html += data[i][property];
+                    html += '</td>';
+                  }
+                }
+              }
+              html += '</tr>';
+            }
+            html += '</table>';
+          }
+        }
+
+        show(DATA_.currentPage, html);
+
+        debugExit("showData");
+      }
+
+      /*************************************************************************
+       * 
+       * Show an error on the page, and log it to the console.
+       * 
+       ************************************************************************/
+      function showError(error, msg) {
+        debugEnter("showError");
+
+        console.log(error);
+        let message = 'Super super sorry, there was some kind of error.';
+        if (msg) {
+          message = msg;
+        }
+        show('Problem!', message);
+
+        debugExit("showError");
+      }
+
+      /*************************************************************************
+       * 
+       * Load data for the page from the server / Google Sheets Apps Script.
+       * 
+       ************************************************************************/
+      function loadPage(name) {
+        debugEnter("loadPage");
+
+        DATA_.currentPage = name;
+        showHeadings(DATA_.headings);
+
+        // This loop inspects the headings, and if the heading name matches any of
+        // them, and it contains a sheet name, we call for the data from the
+        // server / Google Sheets Apps Script.
+        for (let i = 0; i < DATA_.headings.length; i++) {
+          if (DATA_.headings[i][0] == name) {
+            if (DATA_.headings[i][2]) {
+              google.script.run.withSuccessHandler(showData)
+                .withFailureHandler(showError)
+                .getSheetContents(DATA_.headings[i][2]);
+
+              // while it's loading, show a loading message.
+              show(name, LOADING);
+              return;
+            }
+          }
+        }
+        showData();
+
+        debugExit("loadPage");
+      }
+
+      /*************************************************************************
+       * 
+       * Set page title and page content.
+       * 
+       ************************************************************************/
+      function show(title, content) {
+        debugEnter("show");
+
+        document.getElementById(PAGE_TITLE).innerHTML = title;
+        document.getElementById(PAGE_CONTENT).innerHTML = content;
+
+        debugExit("show");
+      }
+
+      /*************************************************************************
+       * 
+       * Save the headings, and create the page navigation links from them.
+       * 
+       ************************************************************************/
+      function showHeadings(headings) {
+        debugEnter("showHeadings");
+
+        DATA_.headings = headings;
+        let html = '';
+        for (let i = 0; i < headings.length; i++) {
+          if (headings[i][0] == DATA_.currentPage) {
+            html += '<span class="SelectedLink">';
+            html += headings[i][0];
+            html += '</span>';
+          } else {
+            html += '<a href="javascript:loadPage(\'';
+            html += headings[i][0].replaceAll('\'', '\\\'');
+            html += '\');">';
+            html += headings[i][0];
+            html += '</a>';
+          }
+        }
+        document.getElementById(PAGE_NAV).innerHTML = html;
+
+        debugExit("showHeadings");
+      }
+
+      /*************************************************************************
+       * 
+       * Show the headings, and if any exist, load the first one.
+       * 
+       ************************************************************************/
+      function showInitialHeadings(headings) {
+        debugEnter("showInitialHeadings");
+
+        showHeadings(headings);
+        if (headings && headings.length > 0) {
+          // If any pages are available, load the first one.
+          loadPage(headings[0][0]);
+        }
+
+        debugExit("showInitialHeadings");
+      }
+
+
+      /*************************************************************************
+       * 
+       * If DEBUG=true, log message to console.
+       * 
+       ************************************************************************/
+      function debugLog(msg) {
+        if (DEBUG) {
+          console.log(msg);
+        }
+      }
+
+      /*************************************************************************
+       * 
+       * Called when a function is entered for debug messages.
+       * 
+       ************************************************************************/
+      function debugEnter(msg) {
+        debugLog(">> " + msg + " (enter)");
+      }
+
+      /*************************************************************************
+       * 
+       * Called when a function is exited for debug messages.
+       * 
+       ************************************************************************/
+      function debugExit(msg) {
+        debugLog("<< " + msg + " (exit)");
+      }
+
+      /*************************************************************************
+       * This calls the server to retrieve the HEADINGS from the Google Sheets
+       * Apps Script. This calls into showInitialHeadings.
+       ************************************************************************/
+      google.script.run.withSuccessHandler(showInitialHeadings)
+        .withFailureHandler(showError)
+        .getHeadings();
+
+
+      /*************************************************************************
+       * This snippet is used to update the "loading..." message on pages.
+       ************************************************************************/
+      setInterval(function() {
+        let content = document.getElementById(PAGE_CONTENT);
+        let text = content.innerHTML;
+        if (text.startsWith(LOADING)) {
+          content.innerHTML += '.';
+        }
+      }, 500);
+
+    </script>
+  </body>
+</html>
