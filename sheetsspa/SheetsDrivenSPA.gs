@@ -30,7 +30,7 @@ const HEADINGS = [
  * 
  ******************************************************************************/
 function doGet(e) {
-  return HtmlService.createTemplateFromFile('main.html').evaluate();
+  return HtmlService.createTemplateFromFile('SheetsDrivenSPA.html').evaluate();
 }
 
 /*******************************************************************************
